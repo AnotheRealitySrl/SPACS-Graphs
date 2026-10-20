@@ -1,5 +1,20 @@
 # Release notes
 
+## Unreleased
+
+No major bump: fixes only, no public API change.
+
+### Fixed
+- **The graph window no longer refreshes the asset database and saves every asset on each edit.**
+  `GraphPanel.SaveGraphAsset` marks the container dirty and saves an asset container once, on the
+  next editor tick (`AssetDatabase.SaveAssetIfDirty`); a scene container is saved with its scene.
+- `Graph.Nodes` no longer replaces the serialized list on every read, and `TryGetContainer` no
+  longer allocates: both are read for every node on each panel update.
+- The graph window restores its last graph across editor sessions (the EditorPrefs key named the
+  window's instance ID, which changes every session, and left a new key behind each time; it now
+  names the project). A container that no longer resolves leaves the window empty instead of throwing.
+- Entering or leaving Play mode no longer opens a graph window when none is open.
+
 ## v3.0.0
 
 ### Changed

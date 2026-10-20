@@ -376,6 +376,9 @@ namespace SPACS.Graphs.Editor
         ///////////////////////////////////////////////////////////////////////////
         public void Update()
         {
+            if (GraphContainer == null || (GraphContainer is Object containerObject && containerObject == null))
+                return;
+
             foreach (Node node in Graph.Nodes)
             {
                 bool nodeElementExists = TryGetElement(node, out NodeElement nodeElement);
@@ -403,12 +406,26 @@ namespace SPACS.Graphs.Editor
         ///////////////////////////////////////////////////////////////////////////
         public void SaveGraphAsset()
         {
-            AssetDatabase.Refresh();
-
+            // Called on every node move, link and field edit. It used to refresh the asset
+            // database and save every asset each time, which made the panel stutter: now the
+            // container is marked dirty at once (a scene container dirties its scene), and an
+            // asset container is written to disk once, on the next editor tick.
             if (GraphContainer is Object containerObject && containerObject != null)
                 EditorUtility.SetDirty(containerObject);
 
-            AssetDatabase.SaveAssets();
+            if (saveScheduled)
+                return;
+            saveScheduled = true;
+            EditorApplication.delayCall += FlushGraphAssetSave;
+        }
+
+        private bool saveScheduled;
+
+        private void FlushGraphAssetSave()
+        {
+            saveScheduled = false;
+            if (GraphContainer is Object containerObject && containerObject != null && EditorUtility.IsPersistent(containerObject))
+                AssetDatabase.SaveAssetIfDirty(containerObject);
         }
         #endregion
 
