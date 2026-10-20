@@ -26,8 +26,11 @@ namespace SPACS.Graphs.Editor
         public IContainer<IGraph> GraphContainer { get; set; }
 
         ///////////////////////////////////////////////////////////////////////////
-        /// The key used in the editor prefs for this window
-        public string EditorPrefWindowDataKey => GetType().Name + GetInstanceID();
+        /// The key used in the editor prefs for this window. EditorPrefs are shared by
+        /// every project on the machine and a window's instance ID changes every session,
+        /// so the key names the project instead: the last session is found again, and no
+        /// new key is left behind each time.
+        public string EditorPrefWindowDataKey => GetType().Name + "." + PlayerSettings.productGUID;
 
 
         ///////////////////////////////////////////////////////////////////////////
@@ -67,7 +70,8 @@ namespace SPACS.Graphs.Editor
         /// Closes the current graph view
         private void CloseGraph()
         {
-            rootVisualElement.Remove(Panel);
+            if (Panel != null && rootVisualElement.Contains(Panel))
+                rootVisualElement.Remove(Panel);
             GraphContainer = null;
             Panel = null;
         }
@@ -86,7 +90,7 @@ namespace SPACS.Graphs.Editor
         {
             if (EditorApplication.isPlaying && GraphContainer != null)
             {
-                Panel.Update();
+                Panel?.Update();
             }
         }
 
@@ -116,14 +120,15 @@ namespace SPACS.Graphs.Editor
         }
 
         ///////////////////////////////////////////////////////////////////////////
-        /// Called when the editor's play mode state changes
-        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        /// Called when the editor's play mode state changes. An instance handler: the
+        /// static one called GetWindow, which opened a graph window on every play mode
+        /// change once one had been opened in the session.
+        private void OnPlayModeStateChanged(PlayModeStateChange state)
         {
-            if (state == PlayModeStateChange.EnteredPlayMode || state == PlayModeStateChange.EnteredEditMode)
-            {
-                GraphWindow window = GetWindow<GraphWindow>();
-                window.TryRestoreLastSession();
-            }
+            if (state == PlayModeStateChange.ExitingEditMode || state == PlayModeStateChange.ExitingPlayMode)
+                SerializeSession();
+            else if (state == PlayModeStateChange.EnteredPlayMode || state == PlayModeStateChange.EnteredEditMode)
+                TryRestoreLastSession();
         }
 
         ///////////////////////////////////////////////////////////////////////////
@@ -154,7 +159,7 @@ namespace SPACS.Graphs.Editor
         /// Serializes the current session (panel scale and position, current container etc.)
         private void SerializeSession()
         {
-            if (GraphContainer != null)
+            if (GraphContainer is Object containerObject && containerObject != null && Panel != null)
             {
                 // Store in the EditorPrefs the current session data
                 SessionData data = new SessionData
@@ -183,9 +188,11 @@ namespace SPACS.Graphs.Editor
             if (!GlobalObjectId.TryParse(data.graphContainerID, out GlobalObjectId id))
                 return;
 
-            // Restore the old view transform
-            Object obj = GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id);
-            OpenGraph(obj as IContainer<IGraph>);
+            // Restore the old view transform. A container that no longer resolves (deleted,
+            // or in a scene that is not open) leaves the window as it is.
+            if (!(GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id) is IContainer<IGraph> container))
+                return;
+            OpenGraph(container);
             Panel?.UpdateViewTransform(data.position, data.scale);
         }
 

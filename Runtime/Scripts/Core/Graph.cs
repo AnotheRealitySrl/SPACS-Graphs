@@ -34,10 +34,17 @@ namespace SPACS.Graphs
         {
             get
             {
+                // Read on every panel update and every lookup: drop the null entries in place
+                // (no new list unless there are some) and copy the values in one pass.
                 if (nodes == null)
                     nodes = new List<TNodeContainer>();
-                nodes = nodes.Where(r => r != null).ToList();
-                return nodes.Select(r => r.Value).ToList();
+                else
+                    nodes.RemoveAll(r => r == null);
+
+                List<Node> result = new List<Node>(nodes.Count);
+                for (int i = 0; i < nodes.Count; i++)
+                    result.Add(nodes[i].Value);
+                return result;
             }
         }
 
@@ -168,7 +175,19 @@ namespace SPACS.Graphs
         /// <returns>The successfulness of the search</returns>
         public bool TryGetContainer(Node node, out TNodeContainer container)
         {
-            container = nodes.Where(r => r != null).FirstOrDefault(r => r.Value == node);
+            container = default;
+            if (nodes != null)
+            {
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    TNodeContainer candidate = nodes[i];
+                    if (candidate != null && candidate.Value == node)
+                    {
+                        container = candidate;
+                        break;
+                    }
+                }
+            }
             if (container is UnityEngine.Object containerObject)
                 return containerObject != null;
             return container != null;
